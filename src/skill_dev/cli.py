@@ -151,7 +151,10 @@ def cmd_sync(args: argparse.Namespace) -> int:
     unit, paths = resolve(args)
     require_worktree(paths)
     cmd = ["skill-manager", "sync", unit.name, "--from", str(paths.worktree_dir), "--merge", "--yes"]
-    return subprocess.run(cmd).returncode
+    try:
+        return subprocess.run(cmd).returncode
+    except FileNotFoundError as exc:
+        raise SkillDevError("skill-manager is not on PATH; install skill-manager or add it to PATH") from exc
 
 
 def cmd_git(args: argparse.Namespace) -> int:
@@ -211,7 +214,14 @@ def resolve(args: argparse.Namespace) -> tuple[InstalledUnit, UnitPaths]:
     if unit.name != args.unit:
         raise SkillDevError(f"metadata name mismatch: requested {args.unit}, record contains {unit.name}")
 
-    kind_dir = "plugins" if unit.unit_kind == "PLUGIN" else "skills"
+    kind_dir = {
+        "SKILL": "skills",
+        "PLUGIN": "plugins",
+        "DOC": "docs",
+        "HARNESS": "harnesses",
+    }.get(unit.unit_kind)
+    if kind_dir is None:
+        raise SkillDevError(f"unsupported unit kind in metadata: {unit.unit_kind}")
     installed_dir = home / kind_dir / unit.name
     project_root = project_root_for(args.project)
     worktree_root = project_root / "skill-dev"

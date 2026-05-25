@@ -4,6 +4,7 @@ import json
 import os
 import contextlib
 import io
+import shutil
 import subprocess
 import tempfile
 import unittest
@@ -122,6 +123,17 @@ class SkillDevCliTest(unittest.TestCase):
             f"sync reviewer-skill --from {(self.project / 'skill-dev' / 'reviewer-skill').resolve()} --merge --yes",
             log.read_text().strip(),
         )
+
+    def test_sync_reports_missing_skill_manager_without_traceback(self) -> None:
+        self.assertEqual(0, self.invoke("open", "reviewer-skill", "--branch", "skill-dev/test"))
+        fake_bin = self.root / "git-only-bin"
+        fake_bin.mkdir()
+        git_path = shutil.which("git")
+        self.assertIsNotNone(git_path)
+        (fake_bin / "git").symlink_to(git_path)
+        os.environ["PATH"] = str(fake_bin)
+
+        self.assertEqual(2, self.invoke("sync", "reviewer-skill"))
 
     def test_plugin_metadata_resolves_plugin_directory(self) -> None:
         plugin = self.home / "plugins" / "demo-plugin"
