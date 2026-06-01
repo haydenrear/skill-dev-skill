@@ -106,34 +106,86 @@ class SkillDevCliTest(unittest.TestCase):
         self.assertEqual(0, self.invoke("git", "reviewer-skill", "--", "status", "--short"))
 
     def test_sync_delegates_to_skill_manager_merge_from_worktree(self) -> None:
+        old_path = os.environ.get("PATH")
         fake_bin = self.root / "bin"
         fake_bin.mkdir()
         log = self.root / "sync.log"
         skill_manager = fake_bin / "skill-manager"
         skill_manager.write_text(
             "#!/usr/bin/env bash\n"
-            "printf '%s\\n' \"$*\" > \"" + str(log) + "\"\n"
+            "printf '%s\\n%s\\n' \"$SKILL_MANAGER_HOME\" \"$*\" > \"" + str(log) + "\"\n"
         )
         skill_manager.chmod(0o755)
-        os.environ["PATH"] = str(fake_bin) + os.pathsep + os.environ["PATH"]
-        self.assertEqual(0, self.invoke("open", "reviewer-skill", "--branch", "skill-dev/test"))
+        try:
+            os.environ["PATH"] = str(fake_bin) + os.pathsep + os.environ["PATH"]
+            self.assertEqual(0, self.invoke("open", "reviewer-skill", "--branch", "skill-dev/test"))
 
-        self.assertEqual(0, self.invoke("sync", "reviewer-skill"))
+            self.assertEqual(0, self.invoke("sync", "reviewer-skill"))
+        finally:
+            if old_path is None:
+                os.environ.pop("PATH", None)
+            else:
+                os.environ["PATH"] = old_path
+        lines = log.read_text().splitlines()
+        self.assertEqual(str(self.home.resolve()), lines[0])
         self.assertEqual(
             f"sync reviewer-skill --from {(self.project / 'skill-dev' / 'reviewer-skill').resolve()} --merge --yes",
-            log.read_text().strip(),
+            lines[1],
         )
 
     def test_sync_reports_missing_skill_manager_without_traceback(self) -> None:
+        old_path = os.environ.get("PATH")
         self.assertEqual(0, self.invoke("open", "reviewer-skill", "--branch", "skill-dev/test"))
         fake_bin = self.root / "git-only-bin"
         fake_bin.mkdir()
         git_path = shutil.which("git")
         self.assertIsNotNone(git_path)
         (fake_bin / "git").symlink_to(git_path)
-        os.environ["PATH"] = str(fake_bin)
+        try:
+            os.environ["PATH"] = str(fake_bin)
 
-        self.assertEqual(2, self.invoke("sync", "reviewer-skill"))
+            self.assertEqual(2, self.invoke("sync", "reviewer-skill"))
+        finally:
+            if old_path is None:
+                os.environ.pop("PATH", None)
+            else:
+                os.environ["PATH"] = old_path
+
+    def test_sync_uses_explicit_home_for_delegate(self) -> None:
+        old_home = os.environ.get("SKILL_MANAGER_HOME")
+        old_path = os.environ.get("PATH")
+        fake_bin = self.root / "home-bin"
+        fake_bin.mkdir()
+        log = self.root / "explicit-home.log"
+        skill_manager = fake_bin / "skill-manager"
+        skill_manager.write_text(
+            "#!/usr/bin/env bash\n"
+            "printf '%s\\n' \"$SKILL_MANAGER_HOME\" > \"" + str(log) + "\"\n"
+        )
+        skill_manager.chmod(0o755)
+        try:
+            os.environ["PATH"] = str(fake_bin) + os.pathsep + os.environ["PATH"]
+            os.environ["SKILL_MANAGER_HOME"] = str(self.root / "wrong-home")
+            self.assertEqual(0, self.invoke("open", "reviewer-skill", "--branch", "skill-dev/test"))
+
+            old_cwd = Path.cwd()
+            try:
+                os.chdir(self.project)
+                with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+                    rc = main(["--home", str(self.home), "sync", "reviewer-skill"])
+            finally:
+                os.chdir(old_cwd)
+        finally:
+            if old_home is None:
+                os.environ.pop("SKILL_MANAGER_HOME", None)
+            else:
+                os.environ["SKILL_MANAGER_HOME"] = old_home
+            if old_path is None:
+                os.environ.pop("PATH", None)
+            else:
+                os.environ["PATH"] = old_path
+        self.assertEqual(0, rc)
+        self.assertEqual(str(self.home.resolve()), log.read_text().strip())
 
     def test_plugin_metadata_resolves_plugin_directory(self) -> None:
         plugin = self.home / "plugins" / "demo-plugin"

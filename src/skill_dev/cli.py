@@ -151,8 +151,10 @@ def cmd_sync(args: argparse.Namespace) -> int:
     unit, paths = resolve(args)
     require_worktree(paths)
     cmd = ["skill-manager", "sync", unit.name, "--from", str(paths.worktree_dir), "--merge", "--yes"]
+    env = os.environ.copy()
+    env["SKILL_MANAGER_HOME"] = str(paths.home)
     try:
-        return subprocess.run(cmd).returncode
+        return subprocess.run(cmd, env=env).returncode
     except FileNotFoundError as exc:
         raise SkillDevError("skill-manager is not on PATH; install skill-manager or add it to PATH") from exc
 
