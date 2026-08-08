@@ -1,6 +1,6 @@
 ---
 name: skill-dev-skill
-description: Use for DELIBERATE, iterative development of one installed skill-manager unit through a project-local `skill-dev/<unit>` worktree and the skill-dev CLI (open/sync/close --merge) — a long-lived editing session against the store copy. NOT the front door for "I edited a skill during a ticket and it must survive": that is `skt publish` (home sync one tier up, then unit publish), and ticket worktrees themselves are `skt ticket` / git-issue-workflow's `wt`, not skill-dev.
+description: 'Use for DELIBERATE, iterative development of one installed skill-manager unit through a project-local `skill-dev/<unit>` worktree and the skill-dev CLI (open/sync/close --merge) — a long-lived editing session against the store copy. NOT the front door for "I edited a skill during a ticket and it must survive": that is `skt publish` (home sync one tier up, then unit publish), and ticket worktrees themselves are `skt ticket` / git-issue-workflow''s `wt`, not skill-dev.'
 skill-imports:
   - unit: skill-manager
     path: references/cli.md
